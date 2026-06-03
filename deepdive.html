@@ -82,6 +82,29 @@ textarea {
   <div class="tickers" id="quick"></div>
 </div>
 
+<div class="box" id="quoteBox" style="display:none;">
+  <div style="display:flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;">
+    <div>
+      <span id="qTicker" style="font-size: 28px; font-weight: 700; color: #fff;"></span>
+      <span id="qName" style="color: #888; margin-left: 8px; font-size: 14px;"></span>
+    </div>
+    <div style="text-align: right;">
+      <span id="qPrice" style="font-size: 28px; font-weight: 700; color: #fff;"></span>
+      <span id="qChange" style="font-size: 16px; margin-left: 8px;"></span>
+    </div>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; font-size: 13px; color: #aaa;">
+    <div>开盘 <span id="qOpen" style="color: #fff;"></span></div>
+    <div>日内区间 <span id="qDayRange" style="color: #fff;"></span></div>
+    <div>成交量 <span id="qVolume" style="color: #fff;"></span></div>
+    <div>52周 <span id="q52w" style="color: #fff;"></span></div>
+    <div>市值 <span id="qMcap" style="color: #fff;"></span></div>
+    <div>P/E (TTM) <span id="qPE" style="color: #fff;"></span></div>
+  </div>
+  <div id="qErr" style="color: #fa4; font-size: 12px; margin-top: 8px;"></div>
+  <div class="hint">实时数据来自 Yahoo Finance 公开 API. 详细分析还是用上面 prompt 喂 Claude.ai.</div>
+</div>
+
 <div class="box">
   <label>Generated prompt (paste this into Claude.ai)</label>
   <textarea id="prompt" readonly placeholder="Click 'Generate Prompt' to fill this in"></textarea>
@@ -145,6 +168,69 @@ function gen() {
   const t = tickerInput.value.trim().toUpperCase();
   if (!t) { promptArea.value = ""; return; }
   promptArea.value = PROMPT_TEMPLATE(t);
+  fetchQuote(t);
+}
+
+const fmt = (n, d = 2) => (n == null || isNaN(n)) ? "—" :
+  n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtBig = (n) => {
+  if (n == null || isNaN(n)) return "—";
+  if (n >= 1e12) return (n / 1e12).toFixed(2) + "T";
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
+  return String(n);
+};
+
+let quoteTimer = null;
+async function fetchQuote(ticker) {
+  const box = document.getElementById("quoteBox");
+  const errEl = document.getElementById("qErr");
+  errEl.textContent = "";
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1y`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    const result = data?.chart?.result?.[0];
+    if (!result) throw new Error("No data for " + ticker);
+    const meta = result.meta;
+    const price = meta.regularMarketPrice;
+    const prevClose = meta.chartPreviousClose || meta.previousClose;
+    const chg = price - prevClose;
+    const chgPct = (chg / prevClose) * 100;
+    const dayHigh = meta.regularMarketDayHigh;
+    const dayLow = meta.regularMarketDayLow;
+    const yearHigh = meta.fiftyTwoWeekHigh;
+    const yearLow = meta.fiftyTwoWeekLow;
+    const volume = meta.regularMarketVolume;
+    const currency = meta.currency || "USD";
+    document.getElementById("qTicker").textContent = ticker;
+    document.getElementById("qName").textContent = meta.longName || meta.shortName || "";
+    document.getElementById("qPrice").textContent = currency === "USD" ? "$" + fmt(price) : fmt(price) + " " + currency;
+    const chgEl = document.getElementById("qChange");
+    chgEl.textContent = (chg >= 0 ? "+" : "") + fmt(chg) + " (" + (chgPct >= 0 ? "+" : "") + fmt(chgPct) + "%)";
+    chgEl.style.color = chg >= 0 ? "#4f4" : "#f44";
+    document.getElementById("qOpen").textContent = "$" + fmt(meta.regularMarketOpen || prevClose);
+    document.getElementById("qDayRange").textContent = `$${fmt(dayLow)} – $${fmt(dayHigh)}`;
+    document.getElementById("qVolume").textContent = fmtBig(volume);
+    document.getElementById("q52w").textContent = `$${fmt(yearLow)} – $${fmt(yearHigh)}`;
+    // Yahoo chart API doesn't return marketCap / P/E — show "—"
+    document.getElementById("qMcap").textContent = "— (chart API)";
+    document.getElementById("qPE").textContent = "— (chart API)";
+    box.style.display = "block";
+  } catch (e) {
+    box.style.display = "block";
+    errEl.textContent = "Yahoo Finance 数据获取失败: " + e.message + " (可能是 ticker 拼错 / 非美股 / 网络问题). prompt 仍然能用.";
+    document.getElementById("qTicker").textContent = ticker;
+    document.getElementById("qName").textContent = "";
+    document.getElementById("qPrice").textContent = "—";
+    document.getElementById("qChange").textContent = "";
+    document.getElementById("qOpen").textContent = "—";
+    document.getElementById("qDayRange").textContent = "—";
+    document.getElementById("qVolume").textContent = "—";
+    document.getElementById("q52w").textContent = "—";
+  }
 }
 
 function copyText() {
