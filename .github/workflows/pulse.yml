@@ -6,6 +6,9 @@ on:
     - cron: '*/15 13-21 * * 1-5'
   # Manual trigger for testing
   workflow_dispatch:
+  # Push to main — also deploy (e.g. after editing deepdive.html or state.json)
+  push:
+    branches: [main]
 
 # Minimal permissions for Pages deploy
 permissions:
