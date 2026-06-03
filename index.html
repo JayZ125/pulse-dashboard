@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="900">
+<title>US Tech Pulse</title>
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+  color: #eee; padding: 24px; max-width: 720px; margin: 0 auto; min-height: 100vh;
+}
+h1 { color: #fff; font-size: 28px; margin: 0 0 8px; }
+.ts { color: #888; font-size: 14px; margin-bottom: 16px; }
+.warn {
+  background: rgba(255, 200, 50, 0.1);
+  border: 1px solid rgba(255, 200, 50, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px; color: #fc6; font-size: 13px; margin-bottom: 16px;
+}
+.pick {
+  background: rgba(255,255,255,0.04);
+  border-left: 4px solid #4af;
+  border-radius: 6px; padding: 14px 18px; margin: 10px 0;
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px;
+}
+.pick-buy { border-left-color: #4f4; }
+.pick-watch { border-left-color: #fa4; }
+.pick-skip { border-left-color: #888; }
+.ticker { font-size: 28px; font-weight: 700; color: #fff; }
+.signal {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 12px; margin-left: 8px; font-weight: 600;
+}
+.signal-buy { background: #4f4; color: #000; }
+.signal-watch { background: #fa4; color: #000; }
+.signal-skip { background: #555; color: #fff; }
+.score { font-size: 32px; font-weight: 800; color: #4af; min-width: 60px; text-align: right; }
+.note { color: #aaa; font-size: 13px; margin-top: 6px; }
+.detail { margin-top: 8px; }
+.detail span {
+  display: inline-block; background: rgba(255,255,255,0.06);
+  padding: 3px 8px; border-radius: 3px; margin-right: 6px; margin-bottom: 4px;
+  font-size: 12px; color: #ccc;
+}
+.chg-up { color: #4f4; }
+.chg-down { color: #f44; }
+h2 {
+  color: #ccc; font-size: 16px; margin: 32px 0 12px;
+  border-bottom: 1px solid #333; padding-bottom: 6px;
+}
+table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #222; }
+th { color: #888; font-weight: normal; font-size: 12px; background: rgba(255,255,255,0.03); }
+tbody tr:hover { background: rgba(255,255,255,0.04); }
+td.shrink { white-space: nowrap; }
+.footer {
+  color: #666; font-size: 11px; margin-top: 32px; text-align: center;
+  border-top: 1px solid #333; padding-top: 16px;
+}
+</style>
+</head>
+<body>
+<div style="text-align: right; margin-bottom: 12px;"><a href="deepdive.html" style="color: #4af; text-decoration: none; background: rgba(74,170,255,0.1); padding: 6px 12px; border-radius: 4px; font-size: 14px;">🔍 Single-stock deep-dive tool →</a></div><h1>🔔 US Tech Pulse</h1>
+<div class="ts">2026-06-03 10:34:53 ET</div>
+
+
+<div class="pick pick-skip">
+  <div style="flex:1;">
+    <div><span class="ticker">SNDK</span><span class="signal signal-skip">⚪ HOLD</span></div>
+    <div class="note">中性, 不入场 / 已涨3%+追高风险</div>
+    <div class="detail">
+      <span>$1796.0</span>
+      <span class="chg-up">+3.46%</span>
+      <span>开 $1736.0</span>
+      <span>RSI 70.6</span>
+      <span>动量 92.7</span>
+      <span>突破 95.2</span>
+      <span>反转 10.0</span>
+    </div>
+  </div>
+  <div class="score">68.4</div>
+</div>
+
+<div class="pick pick-watch">
+  <div style="flex:1;">
+    <div><span class="ticker">AEHR</span><span class="signal signal-watch">🟡 WATCH</span></div>
+    <div class="note">分高但 RSI 87.0 超买 / 已涨3%+追高风险</div>
+    <div class="detail">
+      <span>$120.4</span>
+      <span class="chg-up">+5.38%</span>
+      <span>开 $114.25</span>
+      <span>RSI 87.0</span>
+      <span>动量 92.0</span>
+      <span>突破 94.4</span>
+      <span>反转 10.0</span>
+    </div>
+  </div>
+  <div class="score">67.9</div>
+</div>
+
+<div class="pick pick-watch">
+  <div style="flex:1;">
+    <div><span class="ticker">NVTS</span><span class="signal signal-watch">🟡 WATCH</span></div>
+    <div class="note">分高但 RSI 88.3 超买 / 已涨3%+追高风险</div>
+    <div class="detail">
+      <span>$32.15</span>
+      <span class="chg-up">+5.20%</span>
+      <span>开 $30.56</span>
+      <span>RSI 88.3</span>
+      <span>动量 95.2</span>
+      <span>突破 84.9</span>
+      <span>反转 10.0</span>
+    </div>
+  </div>
+  <div class="score">66.0</div>
+</div>
+
+
+<h2>📊 Full ranking — all 37 tickers (by score, desc)</h2>
+<table>
+  <thead>
+    <tr>
+      <th>#</th><th>Ticker</th><th>Score</th><th>Signal</th>
+      <th>Now</th><th>ΔDay</th><th>RSI</th><th>Vol</th>
+    </tr>
+  </thead>
+  <tbody>
+<tr>
+  <td class="shrink">1</td>
+  <td class="shrink"><strong>SNDK</strong></td>
+  <td class="shrink">68.4</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$1796.0</td>
+  <td class="shrink chg-up">+3.46%</td>
+  <td class="shrink">70.6</td>
+  <td class="shrink">1.1x</td>
+</tr>
+
+<tr>
+  <td class="shrink">2</td>
+  <td class="shrink"><strong>AEHR</strong></td>
+  <td class="shrink">67.9</td>
+  <td class="shrink">🟡 WATCH</td>
+  <td class="shrink">$120.4</td>
+  <td class="shrink chg-up">+5.38%</td>
+  <td class="shrink">87.0</td>
+  <td class="shrink">0.36x</td>
+</tr>
+
+<tr>
+  <td class="shrink">3</td>
+  <td class="shrink"><strong>NVTS</strong></td>
+  <td class="shrink">66.0</td>
+  <td class="shrink">🟡 WATCH</td>
+  <td class="shrink">$32.15</td>
+  <td class="shrink chg-up">+5.20%</td>
+  <td class="shrink">88.3</td>
+  <td class="shrink">0.39x</td>
+</tr>
+
+<tr>
+  <td class="shrink">4</td>
+  <td class="shrink"><strong>RKLB</strong></td>
+  <td class="shrink">62.7</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$120.21</td>
+  <td class="shrink chg-up">+0.68%</td>
+  <td class="shrink">26.4</td>
+  <td class="shrink">0.3x</td>
+</tr>
+
+<tr>
+  <td class="shrink">5</td>
+  <td class="shrink"><strong>NEM</strong></td>
+  <td class="shrink">62.2</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$107.56</td>
+  <td class="shrink chg-down">-0.40%</td>
+  <td class="shrink">29.8</td>
+  <td class="shrink">0.27x</td>
+</tr>
+
+<tr>
+  <td class="shrink">6</td>
+  <td class="shrink"><strong>CSCO</strong></td>
+  <td class="shrink">61.0</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$127.12</td>
+  <td class="shrink chg-up">+0.89%</td>
+  <td class="shrink">48.6</td>
+  <td class="shrink">0.23x</td>
+</tr>
+
+<tr>
+  <td class="shrink">7</td>
+  <td class="shrink"><strong>MRVL</strong></td>
+  <td class="shrink">60.4</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$315.09</td>
+  <td class="shrink chg-down">-0.93%</td>
+  <td class="shrink">84.9</td>
+  <td class="shrink">0.49x</td>
+</tr>
+
+<tr>
+  <td class="shrink">8</td>
+  <td class="shrink"><strong>QCOM</strong></td>
+  <td class="shrink">60.2</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$249.48</td>
+  <td class="shrink chg-up">+6.15%</td>
+  <td class="shrink">68.5</td>
+  <td class="shrink">0.48x</td>
+</tr>
+
+<tr>
+  <td class="shrink">9</td>
+  <td class="shrink"><strong>MS</strong></td>
+  <td class="shrink">59.4</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$210.32</td>
+  <td class="shrink chg-down">-1.19%</td>
+  <td class="shrink">21.6</td>
+  <td class="shrink">0.4x</td>
+</tr>
+
+<tr>
+  <td class="shrink">10</td>
+  <td class="shrink"><strong>AMAT</strong></td>
+  <td class="shrink">59.3</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$502.95</td>
+  <td class="shrink chg-up">+3.07%</td>
+  <td class="shrink">92.2</td>
+  <td class="shrink">0.38x</td>
+</tr>
+
+<tr>
+  <td class="shrink">11</td>
+  <td class="shrink"><strong>BLK</strong></td>
+  <td class="shrink">58.9</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$989.44</td>
+  <td class="shrink chg-down">-1.17%</td>
+  <td class="shrink">23.7</td>
+  <td class="shrink">0.23x</td>
+</tr>
+
+<tr>
+  <td class="shrink">12</td>
+  <td class="shrink"><strong>GOOGL</strong></td>
+  <td class="shrink">58.2</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$362.31</td>
+  <td class="shrink chg-up">+0.08%</td>
+  <td class="shrink">28.1</td>
+  <td class="shrink">0.33x</td>
+</tr>
+
+<tr>
+  <td class="shrink">13</td>
+  <td class="shrink"><strong>GOOG</strong></td>
+  <td class="shrink">58.1</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$358.51</td>
+  <td class="shrink chg-up">+0.05%</td>
+  <td class="shrink">25.2</td>
+  <td class="shrink">0.27x</td>
+</tr>
+
+<tr>
+  <td class="shrink">14</td>
+  <td class="shrink"><strong>TSLA</strong></td>
+  <td class="shrink">57.1</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$430.01</td>
+  <td class="shrink chg-up">+2.70%</td>
+  <td class="shrink">73.0</td>
+  <td class="shrink">0.49x</td>
+</tr>
+
+<tr>
+  <td class="shrink">15</td>
+  <td class="shrink"><strong>OXY</strong></td>
+  <td class="shrink">56.9</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$60.01</td>
+  <td class="shrink chg-up">+0.82%</td>
+  <td class="shrink">74.6</td>
+  <td class="shrink">0.59x</td>
+</tr>
+
+<tr>
+  <td class="shrink">16</td>
+  <td class="shrink"><strong>ADBE</strong></td>
+  <td class="shrink">56.3</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$254.18</td>
+  <td class="shrink chg-down">-1.90%</td>
+  <td class="shrink">23.7</td>
+  <td class="shrink">0.23x</td>
+</tr>
+
+<tr>
+  <td class="shrink">17</td>
+  <td class="shrink"><strong>XOM</strong></td>
+  <td class="shrink">56.3</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$153.28</td>
+  <td class="shrink chg-up">+1.78%</td>
+  <td class="shrink">76.8</td>
+  <td class="shrink">0.2x</td>
+</tr>
+
+<tr>
+  <td class="shrink">18</td>
+  <td class="shrink"><strong>META</strong></td>
+  <td class="shrink">56.2</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$616.06</td>
+  <td class="shrink chg-up">+2.17%</td>
+  <td class="shrink">69.4</td>
+  <td class="shrink">0.32x</td>
+</tr>
+
+<tr>
+  <td class="shrink">19</td>
+  <td class="shrink"><strong>AXP</strong></td>
+  <td class="shrink">55.6</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$303.95</td>
+  <td class="shrink chg-down">-1.53%</td>
+  <td class="shrink">14.8</td>
+  <td class="shrink">0.35x</td>
+</tr>
+
+<tr>
+  <td class="shrink">20</td>
+  <td class="shrink"><strong>IONQ</strong></td>
+  <td class="shrink">55.1</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$70.88</td>
+  <td class="shrink chg-up">+0.80%</td>
+  <td class="shrink">53.5</td>
+  <td class="shrink">0.49x</td>
+</tr>
+
+<tr>
+  <td class="shrink">21</td>
+  <td class="shrink"><strong>ORCL</strong></td>
+  <td class="shrink">55.0</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$232.39</td>
+  <td class="shrink chg-down">-3.36%</td>
+  <td class="shrink">23.3</td>
+  <td class="shrink">0.3x</td>
+</tr>
+
+<tr>
+  <td class="shrink">22</td>
+  <td class="shrink"><strong>MU</strong></td>
+  <td class="shrink">53.8</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$1070.26</td>
+  <td class="shrink chg-down">-0.81%</td>
+  <td class="shrink">63.3</td>
+  <td class="shrink">0.43x</td>
+</tr>
+
+<tr>
+  <td class="shrink">23</td>
+  <td class="shrink"><strong>IBM</strong></td>
+  <td class="shrink">53.6</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$308.49</td>
+  <td class="shrink chg-down">-3.08%</td>
+  <td class="shrink">26.0</td>
+  <td class="shrink">0.25x</td>
+</tr>
+
+<tr>
+  <td class="shrink">24</td>
+  <td class="shrink"><strong>CRM</strong></td>
+  <td class="shrink">53.0</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$192.4</td>
+  <td class="shrink chg-down">-2.47%</td>
+  <td class="shrink">31.5</td>
+  <td class="shrink">0.28x</td>
+</tr>
+
+<tr>
+  <td class="shrink">25</td>
+  <td class="shrink"><strong>QQQ</strong></td>
+  <td class="shrink">52.6</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$746.16</td>
+  <td class="shrink chg-down">-0.16%</td>
+  <td class="shrink">57.5</td>
+  <td class="shrink">0.42x</td>
+</tr>
+
+<tr>
+  <td class="shrink">26</td>
+  <td class="shrink"><strong>TXN</strong></td>
+  <td class="shrink">51.3</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$307.53</td>
+  <td class="shrink chg-down">-0.36%</td>
+  <td class="shrink">64.4</td>
+  <td class="shrink">0.19x</td>
+</tr>
+
+<tr>
+  <td class="shrink">27</td>
+  <td class="shrink"><strong>TSM</strong></td>
+  <td class="shrink">50.3</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$440.43</td>
+  <td class="shrink chg-down">-2.12%</td>
+  <td class="shrink">45.5</td>
+  <td class="shrink">0.29x</td>
+</tr>
+
+<tr>
+  <td class="shrink">28</td>
+  <td class="shrink"><strong>MSFT</strong></td>
+  <td class="shrink">50.2</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$429.55</td>
+  <td class="shrink chg-down">-2.03%</td>
+  <td class="shrink">12.8</td>
+  <td class="shrink">0.66x</td>
+</tr>
+
+<tr>
+  <td class="shrink">29</td>
+  <td class="shrink"><strong>AMD</strong></td>
+  <td class="shrink">49.7</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$535.0</td>
+  <td class="shrink chg-up">+0.22%</td>
+  <td class="shrink">85.5</td>
+  <td class="shrink">0.29x</td>
+</tr>
+
+<tr>
+  <td class="shrink">30</td>
+  <td class="shrink"><strong>INTU</strong></td>
+  <td class="shrink">49.5</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$310.72</td>
+  <td class="shrink chg-down">-2.29%</td>
+  <td class="shrink">13.9</td>
+  <td class="shrink">0.34x</td>
+</tr>
+
+<tr>
+  <td class="shrink">31</td>
+  <td class="shrink"><strong>PFE</strong></td>
+  <td class="shrink">49.5</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$25.33</td>
+  <td class="shrink chg-down">-0.35%</td>
+  <td class="shrink">36.1</td>
+  <td class="shrink">0.45x</td>
+</tr>
+
+<tr>
+  <td class="shrink">32</td>
+  <td class="shrink"><strong>AVGO</strong></td>
+  <td class="shrink">49.3</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$485.03</td>
+  <td class="shrink chg-down">-1.97%</td>
+  <td class="shrink">62.2</td>
+  <td class="shrink">0.26x</td>
+</tr>
+
+<tr>
+  <td class="shrink">33</td>
+  <td class="shrink"><strong>AAPL</strong></td>
+  <td class="shrink">49.0</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$313.92</td>
+  <td class="shrink chg-down">-0.08%</td>
+  <td class="shrink">44.0</td>
+  <td class="shrink">0.43x</td>
+</tr>
+
+<tr>
+  <td class="shrink">34</td>
+  <td class="shrink"><strong>CRCL</strong></td>
+  <td class="shrink">48.2</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$95.33</td>
+  <td class="shrink chg-down">-3.88%</td>
+  <td class="shrink">22.7</td>
+  <td class="shrink">0.21x</td>
+</tr>
+
+<tr>
+  <td class="shrink">35</td>
+  <td class="shrink"><strong>NVDA</strong></td>
+  <td class="shrink">47.7</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$215.16</td>
+  <td class="shrink chg-down">-2.94%</td>
+  <td class="shrink">15.4</td>
+  <td class="shrink">0.43x</td>
+</tr>
+
+<tr>
+  <td class="shrink">36</td>
+  <td class="shrink"><strong>NOW</strong></td>
+  <td class="shrink">47.4</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$122.32</td>
+  <td class="shrink chg-down">-4.43%</td>
+  <td class="shrink">36.2</td>
+  <td class="shrink">0.3x</td>
+</tr>
+
+<tr>
+  <td class="shrink">37</td>
+  <td class="shrink"><strong>INTC</strong></td>
+  <td class="shrink">45.7</td>
+  <td class="shrink">⚪ HOLD</td>
+  <td class="shrink">$114.19</td>
+  <td class="shrink chg-down">-1.90%</td>
+  <td class="shrink">79.6</td>
+  <td class="shrink">0.31x</td>
+</tr>
+</tbody>
+</table>
+
+<div class="footer">
+基于规则: 动量30 / 突破30 / 反转20 / 催化20 · 覆盖 34 只 XLK + 自选股 · 非投资建议
+</div>
+</body>
+</html>

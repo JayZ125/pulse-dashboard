@@ -1,0 +1,24 @@
+{
+  "tickers": [
+    "AAPL", "ADBE", "AEHR", "AMD", "AMAT", "AVGO", "AXP",
+    "BLK", "CRM", "CRCL", "CSCO",
+    "GOOG", "GOOGL",
+    "IBM", "INTU", "INTC", "IONQ",
+    "META", "MRVL", "MS", "MSFT", "MU",
+    "NEM", "NOW", "NVDA", "NVTS",
+    "OXY", "ORCL",
+    "PFE",
+    "QCOM", "QQQ",
+    "RKLB",
+    "SNDK",
+    "TSM", "TSLA", "TXN",
+    "XOM"
+  ],
+  "weights": {
+    "momentum": 0.30,
+    "breakout": 0.30,
+    "reversal": 0.20,
+    "catalyst": 0.20
+  },
+  "notes": "Top 20 XLK (tech核心) + user-curated扩展 (能源/金融/医药/黄金/航天/量子/AI测试/GaN/USDC). 共37只. QQQ是ETF, 评分对它不友好, 留着当大盘对照. 加/删ticker用 /us-pulse add|remove TICKER. 权重自动归一化."
+}
