@@ -487,14 +487,6 @@ async function fetchQuote(ticker) {
   }
 }
 
-  // Cache the data + re-render the prompt so it now includes the live data block
-  currentQuote = { ticker, ...data };
-  // Only re-render if the input still matches the ticker we just fetched
-  if (tickerInput.value.trim().toUpperCase() === ticker) {
-    gen();
-  }
-}
-
 function copyText() {
   if (!promptArea.value) { gen(); }
   promptArea.select();
