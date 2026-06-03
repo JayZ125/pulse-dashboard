@@ -183,46 +183,93 @@ const fmtBig = (n) => {
 };
 
 let quoteTimer = null;
+async function fetchYahoo(ticker) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1y`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Yahoo HTTP " + r.status);
+  const data = await r.json();
+  const result = data?.chart?.result?.[0];
+  if (!result) throw new Error("Yahoo: no data for " + ticker);
+  const meta = result.meta;
+  return {
+    source: "Yahoo Finance",
+    name: meta.longName || meta.shortName || ticker,
+    price: meta.regularMarketPrice,
+    prevClose: meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice,
+    open: meta.regularMarketOpen,
+    dayHigh: meta.regularMarketDayHigh,
+    dayLow: meta.regularMarketDayLow,
+    volume: meta.regularMarketVolume,
+    high52w: meta.fiftyTwoWeekHigh,
+    low52w: meta.fiftyTwoWeekLow,
+    pe: null,  // chart API doesn't return
+    mcap: null,
+    currency: meta.currency || "USD",
+  };
+}
+
+async function fetchTencent(ticker) {
+  // Tencent Finance: https://qt.gtimg.cn/q=us{TICKER}
+  // Response format: v_usTICKER="field1~field2~..." (GBK encoded, but
+  // browser auto-decodes text/html responses)
+  const url = `https://qt.gtimg.cn/q=us${encodeURIComponent(ticker)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Tencent HTTP " + r.status);
+  const text = await r.text();
+  const m = text.match(/="([^"]+)"/);
+  if (!m) throw new Error("Tencent: no data for " + ticker);
+  const f = m[1].split("~");
+  if (f.length < 50) throw new Error("Tencent: incomplete data (" + f.length + " fields)");
+  // Field index map (verified 2026-06):
+  //   [3] current price, [4] prev close, [5] open, [6] volume
+  //   [31] change abs, [32] change %, [33] day high, [34] day low
+  //   [39] P/E TTM, [46] English name, [48] 52w high, [49] 52w low
+  return {
+    source: "Tencent Finance",
+    name: f[46] || ticker,
+    price: parseFloat(f[3]),
+    prevClose: parseFloat(f[4]),
+    open: parseFloat(f[5]),
+    dayHigh: parseFloat(f[33]),
+    dayLow: parseFloat(f[34]),
+    volume: parseInt(f[6]) || 0,
+    change: parseFloat(f[31]),
+    changePct: parseFloat(f[32]),
+    high52w: parseFloat(f[48]),
+    low52w: parseFloat(f[49]),
+    pe: parseFloat(f[39]) || null,
+    mcap: null,  // not in easy field
+    currency: f[35] || "USD",
+  };
+}
+
 async function fetchQuote(ticker) {
   const box = document.getElementById("quoteBox");
   const errEl = document.getElementById("qErr");
   errEl.textContent = "";
-  try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1y`;
-    const r = await fetch(url);
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const data = await r.json();
-    const result = data?.chart?.result?.[0];
-    if (!result) throw new Error("No data for " + ticker);
-    const meta = result.meta;
-    const price = meta.regularMarketPrice;
-    const prevClose = meta.chartPreviousClose || meta.previousClose;
-    const chg = price - prevClose;
-    const chgPct = (chg / prevClose) * 100;
-    const dayHigh = meta.regularMarketDayHigh;
-    const dayLow = meta.regularMarketDayLow;
-    const yearHigh = meta.fiftyTwoWeekHigh;
-    const yearLow = meta.fiftyTwoWeekLow;
-    const volume = meta.regularMarketVolume;
-    const currency = meta.currency || "USD";
-    document.getElementById("qTicker").textContent = ticker;
-    document.getElementById("qName").textContent = meta.longName || meta.shortName || "";
-    document.getElementById("qPrice").textContent = currency === "USD" ? "$" + fmt(price) : fmt(price) + " " + currency;
-    const chgEl = document.getElementById("qChange");
-    chgEl.textContent = (chg >= 0 ? "+" : "") + fmt(chg) + " (" + (chgPct >= 0 ? "+" : "") + fmt(chgPct) + "%)";
-    chgEl.style.color = chg >= 0 ? "#4f4" : "#f44";
-    document.getElementById("qOpen").textContent = "$" + fmt(meta.regularMarketOpen || prevClose);
-    document.getElementById("qDayRange").textContent = `$${fmt(dayLow)} – $${fmt(dayHigh)}`;
-    document.getElementById("qVolume").textContent = fmtBig(volume);
-    document.getElementById("q52w").textContent = `$${fmt(yearLow)} – $${fmt(yearHigh)}`;
-    // Yahoo chart API doesn't return marketCap / P/E — show "—"
-    document.getElementById("qMcap").textContent = "— (chart API)";
-    document.getElementById("qPE").textContent = "— (chart API)";
-    box.style.display = "block";
-  } catch (e) {
-    box.style.display = "block";
-    errEl.textContent = "Yahoo Finance 数据获取失败: " + e.message + " (可能是 ticker 拼错 / 非美股 / 网络问题). prompt 仍然能用.";
-    document.getElementById("qTicker").textContent = ticker;
+
+  // Show skeleton immediately
+  box.style.display = "block";
+  document.getElementById("qTicker").textContent = ticker;
+  document.getElementById("qName").textContent = "loading…";
+
+  const tries = [
+    { name: "Yahoo Finance", fn: fetchYahoo },
+    { name: "Tencent Finance", fn: fetchTencent },
+  ];
+  const errors = [];
+  let data = null;
+  for (const t of tries) {
+    try {
+      data = await t.fn(ticker);
+      break;
+    } catch (e) {
+      errors.push(`${t.name}: ${e.message}`);
+    }
+  }
+
+  if (!data) {
+    errEl.textContent = "⚠️ All sources failed — " + errors.join(" / ") + " (prompt 仍然能用, 拷给 Claude.ai).";
     document.getElementById("qName").textContent = "";
     document.getElementById("qPrice").textContent = "—";
     document.getElementById("qChange").textContent = "";
@@ -230,7 +277,34 @@ async function fetchQuote(ticker) {
     document.getElementById("qDayRange").textContent = "—";
     document.getElementById("qVolume").textContent = "—";
     document.getElementById("q52w").textContent = "—";
+    document.getElementById("qMcap").textContent = "—";
+    document.getElementById("qPE").textContent = "—";
+    return;
   }
+
+  // Render
+  const chg = (data.price != null && data.prevClose != null) ? (data.price - data.prevClose) : null;
+  const chgPct = (chg != null && data.prevClose) ? (chg / data.prevClose) * 100 : null;
+  const cur = data.currency || "USD";
+  const cs = cur === "USD" ? "$" : "";
+  const ce = cur === "USD" ? "" : " " + cur;
+
+  document.getElementById("qTicker").textContent = ticker;
+  document.getElementById("qName").textContent = data.name + " · via " + data.source;
+  document.getElementById("qPrice").textContent = cs + fmt(data.price) + ce;
+  const chgEl = document.getElementById("qChange");
+  if (chg != null && chgPct != null) {
+    chgEl.textContent = (chg >= 0 ? "+" : "") + fmt(chg) + " (" + (chgPct >= 0 ? "+" : "") + fmt(chgPct) + "%)";
+    chgEl.style.color = chg >= 0 ? "#4f4" : "#f44";
+  } else {
+    chgEl.textContent = "";
+  }
+  document.getElementById("qOpen").textContent = (data.open != null && !isNaN(data.open)) ? cs + fmt(data.open) : "—";
+  document.getElementById("qDayRange").textContent = (data.dayLow && data.dayHigh) ? `${cs}${fmt(data.dayLow)} – ${cs}${fmt(data.dayHigh)}` : "—";
+  document.getElementById("qVolume").textContent = fmtBig(data.volume);
+  document.getElementById("q52w").textContent = (data.low52w && data.high52w) ? `${cs}${fmt(data.low52w)} – ${cs}${fmt(data.high52w)}` : "—";
+  document.getElementById("qMcap").textContent = data.mcap ? fmtBig(data.mcap) : "—";
+  document.getElementById("qPE").textContent = (data.pe && !isNaN(data.pe)) ? fmt(data.pe) : "—";
 }
 
 function copyText() {
