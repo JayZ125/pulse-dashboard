@@ -131,6 +131,16 @@ const PROMPT_TEMPLATE = (t, q) => {
     const chg = q.change != null ? q.change : (q.price - (q.prevClose || q.price));
     const chgPct = q.changePct != null ? q.changePct : ((q.prevClose ? (chg / q.prevClose * 100) : 0));
     const sign = chg >= 0 ? "+" : "";
+    // Build a list of extra financial metrics, only including those with sane values
+    const extraMetrics = [];
+    if (q.mcap && q.mcap > 0) extraMetrics.push(`市值: ${q.mcap >= 1000 ? (q.mcap/1000).toFixed(2) + "T" : q.mcap.toFixed(0) + "B"} USD`);
+    if (q.pe && q.pe > 0 && q.pe < 1000) extraMetrics.push(`P/E (TTM): ${fmt(q.pe)}`);
+    if (q.peFwd && q.peFwd > 0 && q.peFwd < 1000) extraMetrics.push(`P/E (Forward): ${fmt(q.peFwd)}`);
+    if (q.pb && q.pb > 0 && q.pb < 100) extraMetrics.push(`P/B: ${fmt(q.pb)}`);
+    if (q.ps && q.ps > 0 && q.ps < 100) extraMetrics.push(`P/S: ${fmt(q.ps)}`);
+    if (q.roe && q.roe > 0 && q.roe < 500) extraMetrics.push(`ROE: ${fmt(q.roe)}%`);
+    if (q.turnoverRate && q.turnoverRate > 0) extraMetrics.push(`换手率: ${fmt(q.turnoverRate)}%`);
+
     dataBlock = `
 
 **已知数据 (${q.source}, 实时拉取, **不要重新查 yfinance**):**
@@ -139,9 +149,12 @@ const PROMPT_TEMPLATE = (t, q) => {
 - 开盘: ${cs}${fmt(q.open)}
 - 日内区间: ${cs}${fmt(q.dayLow)} – ${cs}${fmt(q.dayHigh)}
 - 成交量: ${fmtBig(q.volume)}
-- 52周区间: ${cs}${fmt(q.low52w)} – ${cs}${fmt(q.high52w)}${q.pe && !isNaN(q.pe) ? `\n- P/E (TTM): ${fmt(q.pe)}` : ""}
+- 52周区间: ${cs}${fmt(q.low52w)} – ${cs}${fmt(q.high52w)}
+${extraMetrics.length > 0 ? "\n**估值指标:**\n" + extraMetrics.map(m => `- ${m}`).join("\n") + "\n" : ""}
 
-> 上面是实时数据, 估值/技术面章节**直接基于这些数字**, 别浪费时间再查 yfinance. 把精力放在产业链/新闻/前瞻判断上.
+> 上面是实时拉的数据. **直接基于这些数字**写"股价 & 估值"章节, 别再查 yfinance 浪费时间. 把精力放在产业链 / 新闻 / 风险前瞻 / 未来机会上.
+
+> 已知限制 (免费 API 拿不到): Beta, Forward P/S, 利润率, 股息率, 分析师目标价. 这些**你 (Claude) 自己查 yfinance 补** (用 WebFetch).
 `;
   }
 
@@ -251,10 +264,14 @@ async function fetchTencent(ticker) {
   if (!m) throw new Error("Tencent: no data for " + ticker);
   const f = m[1].split("~");
   if (f.length < 50) throw new Error("Tencent: incomplete data (" + f.length + " fields)");
-  // Field index map (verified 2026-06):
-  //   [3] current price, [4] prev close, [5] open, [6] volume
+  // Field index map (verified 2026-06 for US stocks via 'us' prefix):
+  //   [3]  current price, [4] prev close, [5] open, [6] volume
   //   [31] change abs, [32] change %, [33] day high, [34] day low
-  //   [39] P/E TTM, [46] English name, [48] 52w high, [49] 52w low
+  //   [37] turnover (USD), [38] turnover rate %, [39] P/E TTM
+  //   [41] P/B, [43] P/S (?), [44] market cap (in 亿元 = 100M units)
+  //   [46] English name, [48] 52w high, [49] 52w low
+  //   [55] dynamic P/E, [57] ROE %, [65] Beta (?)
+  const marketCapRaw = parseFloat(f[44]);
   return {
     source: "Tencent Finance",
     name: f[46] || ticker,
@@ -269,7 +286,15 @@ async function fetchTencent(ticker) {
     high52w: parseFloat(f[48]),
     low52w: parseFloat(f[49]),
     pe: parseFloat(f[39]) || null,
-    mcap: null,  // not in easy field
+    pb: parseFloat(f[41]) || null,
+    ps: parseFloat(f[43]) || null,
+    peFwd: parseFloat(f[55]) || null,
+    roe: parseFloat(f[57]) || null,
+    mcap: marketCapRaw ? (marketCapRaw / 10) : null,  // 亿元 → 10亿美元 (近似)
+    mcapRaw: marketCapRaw || null,
+    turnover: parseFloat(f[37]) || null,
+    turnoverRate: parseFloat(f[38]) || null,
+    beta: null,  // not confidently mapped
     currency: f[35] || "USD",
   };
 }
