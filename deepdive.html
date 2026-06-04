@@ -682,50 +682,90 @@ async function fetchYahoo(ticker) {
   };
 }
 
+// Per-market Tencent field index maps. Verified 2026-06-05 against qt.gtimg.cn
+// Response format: v_{prefix}{code}="field1~field2~..." (GBK encoded, browser auto-decodes)
+// Common position for price/change/etc across all markets: [3]=price, [4]=prevClose, [5]=open, [6]=volume
+const TENCENT_FIELDS = {
+  us: {  // v_usAAPL etc
+    price: 3, prevClose: 4, open: 5, volume: 6,
+    timestamp: 30, change: 31, changePct: 32, dayHigh: 33, dayLow: 34,
+    name: 46, high52w: 48, low52w: 49,
+    pe: 39, pb: 41, ps: 43, roe: 57, mcap: 44,
+    currency: 35,
+  },
+  hk: {  // v_hk00700 etc
+    price: 3, prevClose: 4, open: 5, volume: 6,
+    timestamp: 30, change: 31, changePct: 32, dayHigh: 33, dayLow: 34,
+    name: 46, high52w: 48, low52w: 49,
+    pe: 47, pb: 38, ps: 39, roe: 40, mcap: 44,
+    currency: 64,  // "HKD"
+  },
+  sh: {  // v_sh600519 etc (Shanghai A-share)
+    price: 3, prevClose: 4, open: 5, volume: 6,
+    timestamp: 30, change: 31, changePct: 32, dayHigh: 33, dayLow: 34,
+    name: 1,  // Chinese name (no English for A-share)
+    high52w: 47, low52w: 48,  // 茅台: 1410/1153 (looks like 52w range)
+    pe: 46, pb: 38, ps: 39, roe: 40, mcap: 44,
+    currency: 64,  // "CNY"
+  },
+  sz: null,  // same as sh
+};
+
 async function fetchTencent(ticker) {
-  // Tencent Finance: https://qt.gtimg.cn/q=us{TICKER}
-  // Response format: v_usTICKER="field1~field2~..." (GBK encoded, but
-  // browser auto-decodes text/html responses)
-  const url = `https://qt.gtimg.cn/q=us${encodeURIComponent(ticker)}`;
+  // Detect market from suffix, strip suffix, pad code
+  let sym = ticker, market = "us";
+  if (ticker.endsWith(".HK"))      { sym = ticker.slice(0, -3); market = "hk"; }
+  else if (ticker.endsWith(".SS")) { sym = ticker.slice(0, -3); market = "sh"; }
+  else if (ticker.endsWith(".SZ")) { sym = ticker.slice(0, -3); market = "sz"; }
+  else if (ticker.endsWith(".BJ")) { sym = ticker.slice(0, -3); market = "bj"; }
+  // Pad numeric codes to canonical length
+  if (/^\d+$/.test(sym)) {
+    if (market === "hk") sym = sym.padStart(5, "0");
+    else if (["sh", "sz", "bj"].includes(market)) sym = sym.padStart(6, "0");
+  }
+  const prefix = {us: "us", hk: "hk", sh: "sh", sz: "sz", bj: "bj"}[market];
+  const url = `https://qt.gtimg.cn/q=${prefix}${encodeURIComponent(sym)}`;
+
   const r = await fetch(url);
   if (!r.ok) throw new Error("Tencent HTTP " + r.status);
   const text = await r.text();
   const m = text.match(/="([^"]+)"/);
   if (!m) throw new Error("Tencent: no data for " + ticker);
   const f = m[1].split("~");
-  if (f.length < 50) throw new Error("Tencent: incomplete data (" + f.length + " fields)");
-  // Field index map (verified 2026-06 for US stocks via 'us' prefix):
-  //   [3]  current price, [4] prev close, [5] open, [6] volume
-  //   [31] change abs, [32] change %, [33] day high, [34] day low
-  //   [37] turnover (USD), [38] turnover rate %, [39] P/E TTM
-  //   [41] P/B, [43] P/S (?), [44] market cap (in 亿元 = 100M units)
-  //   [46] English name, [48] 52w high, [49] 52w low
-  //   [55] dynamic P/E, [57] ROE %, [65] Beta (?)
-  const marketCapRaw = parseFloat(f[44]);
+  if (f.length < 50) throw new Error("Tencent: incomplete data (" + f.length + " fields) for " + ticker);
+
+  // Use sh's map for sz (same structure)
+  const fields = TENCENT_FIELDS[market] || TENCENT_FIELDS.sh;
+  const g = (key) => {
+    const idx = fields[key];
+    if (idx == null || idx >= f.length) return null;
+    const v = f[idx];
+    return (v !== "" && v !== "0" && v != null) ? v : null;
+  };
+
+  // A-share: English name field may be missing, use Chinese from [1]
+  let name = g("name") || "";
+  if (!name && ["sh", "sz", "bj"].includes(market)) name = f[1] || "";
+
   return {
     source: "Tencent Finance",
-    name: f[46] || ticker,
-    price: parseFloat(f[3]),
-    prevClose: parseFloat(f[4]),
-    open: parseFloat(f[5]),
-    dayHigh: parseFloat(f[33]),
-    dayLow: parseFloat(f[34]),
-    volume: parseInt(f[6]) || 0,
-    change: parseFloat(f[31]),
-    changePct: parseFloat(f[32]),
-    high52w: parseFloat(f[48]),
-    low52w: parseFloat(f[49]),
-    pe: parseFloat(f[39]) || null,
-    pb: parseFloat(f[41]) || null,
-    ps: parseFloat(f[43]) || null,
-    peFwd: parseFloat(f[55]) || null,
-    roe: parseFloat(f[57]) || null,
-    mcap: marketCapRaw ? (marketCapRaw / 10) : null,  // 亿元 → 10亿美元 (近似)
-    mcapRaw: marketCapRaw || null,
-    turnover: parseFloat(f[37]) || null,
-    turnoverRate: parseFloat(f[38]) || null,
-    beta: null,  // not confidently mapped
-    currency: f[35] || "USD",
+    name: name || ticker,
+    price: parseFloat(g("price")),
+    prevClose: parseFloat(g("prevClose")),
+    open: parseFloat(g("open")),
+    dayHigh: parseFloat(g("dayHigh")),
+    dayLow: parseFloat(g("dayLow")),
+    volume: parseFloat(g("volume")) || 0,
+    change: parseFloat(g("change")),
+    changePct: parseFloat(g("changePct")),
+    high52w: parseFloat(g("high52w")),
+    low52w: parseFloat(g("low52w")),
+    pe: parseFloat(g("pe")) || null,
+    pb: parseFloat(g("pb")) || null,
+    ps: parseFloat(g("ps")) || null,
+    roe: parseFloat(g("roe")) || null,
+    mcap: parseFloat(g("mcap")) || null,  // 亿元 (A-share) or ? for HK/US
+    currency: market === "us" ? "USD" : market === "hk" ? "HKD" : "CNY",
   };
 }
 
