@@ -70,8 +70,9 @@ textarea {
 </div>
 
 <div class="box">
-  <label for="ticker">Ticker (e.g. AAPL, NVDA, TSLA)</label>
-  <input type="text" id="ticker" placeholder="AAPL" value="NVDA" autocomplete="off" spellcheck="false">
+  <label for="ticker">Ticker (支持中文/英文/港股/A股代码, 例: 苹果 / AAPL / 0700 / 600519 / 腾讯)</label>
+  <input type="text" id="ticker" placeholder="AAPL / 苹果 / 0700 / 600519 / 腾讯" value="NVDA" autocomplete="off" spellcheck="false">
+  <div id="resolvedHint" style="font-size: 12px; margin-top: 4px; min-height: 16px; color: #4f4;"></div>
   <button id="gen">Generate Prompt</button>
   <button id="copy" class="secondary">Copy to Clipboard</button>
   <a id="open" target="_blank" rel="noopener" style="display:inline-block; margin-top:10px; background:#4af; color:#000; padding:10px 20px; border-radius:4px; text-decoration:none; font-weight:600; font-size:14px;">Open Claude.ai →</a>
@@ -140,6 +141,310 @@ textarea {
 // public stock data. Replace with your own key if you fork this.
 const FINNHUB_KEY = "d8g4hq9r01qlgcuh6qogd8g4hq9r01qlgcuh6qp0";
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
+
+// === TICKER MAP (3 markets: US + HK + A-share) ===
+// Keys: any alias (uppercase ticker, lowercase English, Chinese name, numeric code).
+// Values: canonical yfinance ticker (AAPL, 0700.HK, 600519.SS, 000001.SZ, etc.)
+// Add more as needed. Public data, safe to commit to GitHub.
+const TICKER_MAP = {
+  // ===== US (Mega-cap + key names) =====
+  AAPL: "AAPL", APPLE: "AAPL", "苹果": "AAPL",
+  MSFT: "MSFT", MICROSOFT: "MSFT", "微软": "MSFT",
+  NVDA: "NVDA", NVIDIA: "NVDA", "英伟达": "NVDA", "老黄": "NVDA",
+  AVGO: "AVGO", BROADCOM: "AVGO", "博通": "AVGO",
+  GOOGL: "GOOGL", GOOG: "GOOG", GOOGLE: "GOOGL", ALPHABET: "GOOGL", "谷歌": "GOOGL",
+  AMZN: "AMZN", AMAZON: "AMZN", "亚马逊": "AMZN", "贝索斯": "AMZN",
+  META: "META", FACEBOOK: "META", "脸书": "META", "扎克伯格": "META",
+  TSLA: "TSLA", TESLA: "TSLA", "特斯拉": "TSLA", "马斯克": "TSLA",
+  AMD: "AMD", "超微": "AMD", "苏妈": "AMD",
+  INTC: "INTC", INTEL: "INTC", "英特尔": "INTC",
+  IBM: "IBM",
+  ORCL: "ORCL", ORACLE: "ORCL", "甲骨文": "ORCL",
+  CRM: "CRM", SALESFORCE: "CRM",
+  ADBE: "ADBE", ADOBE: "ADBE",
+  CSCO: "CSCO", CISCO: "CSCO", "思科": "CSCO",
+  QCOM: "QCOM", QUALCOMM: "QCOM", "高通": "QCOM",
+  TXN: "TXN", "TEXAS INSTRUMENTS": "TXN", "德州仪器": "TXN",
+  NOW: "NOW", SERVICENOW: "NOW",
+  INTU: "INTU", INTUIT: "INTU",
+  AMAT: "AMAT", "APPLIED MATERIALS": "AMAT", "应用材料": "AMAT",
+  MU: "MU", MICRON: "MU", "美光": "MU",
+  LRCX: "LRCX", "LAM RESEARCH": "LRCX", "泛林": "LRCX",
+  KLAC: "KLAC", KLA: "KLAC", "科磊": "KLAC",
+  SNDK: "SNDK", SANDISK: "SNDK", "闪迪": "SNDK",
+  CRCL: "CRCL", CIRCLE: "CRCL", "稳定币": "CRCL",
+  IONQ: "IONQ", "ION Q": "IONQ", "离子Q": "IONQ",
+  RKLB: "RKLB", "ROCKET LAB": "RKLB", "火箭实验室": "RKLB",
+  UBER: "UBER", "优步": "UBER",
+  ABNB: "ABNB", AIRBNB: "ABNB", "爱彼迎": "ABNB",
+  DASH: "DASH", DOORDASH: "DASH",
+  SHOP: "SHOP", SHOPIFY: "SHOP",
+  PYPL: "PYPL", PAYPAL: "PYPAL" /* typo guard */, "贝宝": "PYPL",
+  SQ: "SQ", BLOCK: "SQ", "块": "SQ",
+  COIN: "COIN", COINBASE: "COIN",
+  HOOD: "HOOD", ROBINHOOD: "HOOD",
+  SOFI: "SOFI",
+  AFRM: "AFRM", AFFIRM: "AFRM",
+  TSM: "TSM", TSMC: "TSM", "台积电": "TSM",
+  ASML: "ASML", "阿斯麦": "ASML",
+  NVO: "NVO", "NOVO NORDISK": "NVO", "诺和诺德": "NVO",
+  PFE: "PFE", PFIZER: "PFE", "辉瑞": "PFE",
+  MRK: "MRK", MERCK: "MRK", "默克": "MRK",
+  LLY: "LLY", "ELI LILLY": "LLY", "礼来": "LLY",
+  JNJ: "JNJ", "JOHNSON & JOHNSON": "JNJ", "JOHNSON AND JOHNSON": "JNJ", "强生": "JNJ",
+  UNH: "UNH", UNITEDHEALTH: "UNH", "联合健康": "UNH",
+  ABBV: "ABBV", ABBVIE: "ABBV", "艾伯维": "ABBV",
+  TMO: "TMO", "THERMO FISHER": "TMO",
+  ABT: "ABT", ABBOTT: "ABT", "雅培": "ABT",
+  BMY: "BMY", "BRISTOL-MYERS": "BMY", "百时美施贵宝": "BMY",
+  AMGN: "AMGN", AMGEN: "AMGN", "安进": "AMGN",
+  GILD: "GILD", GILEAD: "GILD", "吉利德": "GILD",
+  REGN: "REGN", REGENERON: "REGN", "再生元": "REGN",
+  VRTX: "VRTX", VERTEX: "VRTX", "福泰": "VRTX",
+  MRNA: "MRNA", MODERNA: "MRNA", "莫德纳": "MRNA",
+  JPM: "JPM", JPMORGAN: "JPM", "摩根大通": "JPM", "小摩": "JPM",
+  BAC: "BAC", "BANK OF AMERICA": "BAC", "美国银行": "BAC", "美银": "BAC",
+  WFC: "WFC", "WELLS FARGO": "WFC", "富国银行": "WFC",
+  C: "C", CITIGROUP: "C", "花旗": "C",
+  GS: "GS", "GOLDMAN SACHS": "GS", "高盛": "GS",
+  MS: "MS", "MORGAN STANLEY": "MS", "摩根士丹利": "MS", "大摩": "MS",
+  BLK: "BLK", BLACKROCK: "BLK", "贝莱德": "BLK",
+  AXP: "AXP", "AMERICAN EXPRESS": "AXP", "美国运通": "AXP", "运通": "AXP",
+  V: "V", VISA: "V", "维萨": "V",
+  MA: "MA", MASTERCARD: "MA", "万事达": "MA",
+  COF: "COF", "CAPITAL ONE": "COF", "第一资本": "COF",
+  SCHW: "SCHW", SCHWAB: "SCHW", "嘉信": "SCHW",
+  XOM: "XOM", EXXON: "XOM", "EXXONMOBIL": "XOM", "埃克森美孚": "XOM", "美孚": "XOM",
+  CVX: "CVX", CHEVRON: "CVX", "雪佛龙": "CVX",
+  COP: "COP", CONOCOPHILLIPS: "COP", "康菲": "COP",
+  OXY: "OXY", OCCIDENTAL: "OXY", "西方石油": "OXY",
+  SLB: "SLB", SCHLUMBERGER: "SLB", "斯伦贝谢": "SLB",
+  NEE: "NEE", NEXTERA: "NEE", "NEXTERA ENERGY": "NEE", "纽星": "NEE",
+  ENPH: "ENPH", ENPHASE: "ENPH", "阳光电源": "ENPH",
+  BA: "BA", BOEING: "BA", "波音": "BA",
+  CAT: "CAT", CATERPILLAR: "CAT", "卡特彼勒": "CAT",
+  DE: "DE", DEERE: "DE", "迪尔": "DE", "约翰迪尔": "DE",
+  GE: "GE", "GENERAL ELECTRIC": "GE", "通用电气": "GE",
+  HON: "HON", HONEYWELL: "HON", "霍尼韦尔": "HON",
+  LMT: "LMT", "LOCKHEED MARTIN": "LMT", "洛克希德马丁": "LMT",
+  RTX: "RTX", RAYTHEON: "RTX", "雷神": "RTX",
+  F: "F", FORD: "F", "福特": "F",
+  GM: "GM", "GENERAL MOTORS": "GM", "通用汽车": "GM", "通用": "GM",
+  RIVN: "RIVN", RIVIAN: "RIVN",
+  TM: "TM", TOYOTA: "TM", "丰田": "TM",
+  HMC: "HMC", HONDA: "HMC", "本田": "HMC",
+  KO: "KO", "COCA-COLA": "KO", "COCA COLA": "KO", "可口可乐": "KO", "可乐": "KO",
+  PEP: "PEP", PEPSICO: "PEP", "百事": "PEP", "百事可乐": "PEP",
+  WMT: "WMT", WALMART: "WMT", "沃尔玛": "WMT",
+  COST: "COST", COSTCO: "COST", "好市多": "COST",
+  HD: "HD", "HOME DEPOT": "HD", "家得宝": "HD",
+  TGT: "TGT", TARGET: "TGT", "塔吉特": "TGT",
+  LOW: "LOW", LOWES: "LOW", "劳氏": "LOW",
+  MCD: "MCD", MCDONALD: "MCD", "MCDONALDS": "MCD", "麦当劳": "MCD", "金拱门": "MCD",
+  SBUX: "SBUX", STARBUCKS: "SBUX", "星巴克": "SBUX",
+  NKE: "NKE", NIKE: "NKE", "耐克": "NKE",
+  DIS: "DIS", DISNEY: "DIS", "迪士尼": "DIS",
+  NFLX: "NFLX", NETFLIX: "NFLX", "网飞": "NFLX", "奈飞": "NFLX",
+  CMCSA: "CMCSA", COMCAST: "CMCSA", "康卡斯特": "CMCSA",
+  T: "T", "AT&T": "T", "ATT": "T", "美国电话电报": "T",
+  VZ: "VZ", VERIZON: "VZ", "威瑞森": "VZ",
+  PG: "PG", "PROCTER & GAMBLE": "PG", "PROCTER AND GAMBLE": "PG", "宝洁": "PG",
+  EL: "EL", "ESTÉE LAUDER": "EL", "ESTEE LAUDER": "EL", "雅诗兰黛": "EL",
+  MAR: "MAR", MARRIOTT: "MAR", "万豪": "MAR",
+  HLT: "HLT", HILTON: "HLT", "希尔顿": "HLT",
+  AAL: "AAL", "AMERICAN AIRLINES": "AAL", "美国航空": "AAL",
+  DAL: "DAL", DELTA: "DAL", "达美": "DAL", "达美航空": "DAL",
+  UAL: "UAL", UNITED: "UAL", "联合航空": "UAL",
+  EBAY: "EBAY", EBAY: "EBAY", "易贝": "EBAY",
+  ETSY: "ETSY", ETSY: "ETSY",
+  NEM: "NEM", NEWMONT: "NEM", "纽蒙特": "NEM", "纽蒙": "NEM",
+
+  // ===== HK (5-digit codes + names) =====
+  "0700": "0700.HK", "700": "0700.HK", TENCENT: "0700.HK", "腾讯": "0700.HK", "腾讯控股": "0700.HK",
+  "9988": "9988.HK", ALIBABA: "9988.HK", "阿里": "9988.HK", "阿里巴巴": "9988.HK",
+  "9618": "9618.HK", JD: "9618.HK", "京东": "9618.HK", "京东集团": "9618.HK",
+  "3690": "3690.HK", MEITUAN: "3690.HK", "美团": "3690.HK",
+  "1810": "1810.HK", XIAOMI: "1810.HK", "小米": "1810.HK",
+  "9999": "9999.HK", NETEASE: "9999.HK", "网易": "9999.HK",
+  "9888": "9888.HK", BAIDU: "9888.HK", "百度": "9888.HK",
+  "1024": "1024.HK", KUAISHOU: "1024.HK", "快手": "1024.HK",
+  "2382": "2382.HK", "SUNNY OPTICAL": "2382.HK", "舜宇光学": "2382.HK",
+  "0941": "0941.HK", "941": "0941.HK", "CHINA MOBILE": "0941.HK", "中国移动": "0941.HK",
+  "1398": "1398.HK", ICBC: "1398.HK", "工商银行": "1398.HK", "工行": "1398.HK",
+  "1299": "1299.HK", AIA: "1299.HK", "友邦": "1299.HK", "友邦保险": "1299.HK",
+  "0388": "0388.HK", "388": "0388.HK", "HKEX": "0388.HK", "港交所": "0388.HK",
+  "0005": "0005.HK", "5": "0005.HK", HSBC: "0005.HK", "汇丰": "0005.HK",
+  "1928": "1928.HK", "SANDS CHINA": "1928.HK", "金沙中国": "1928.HK",
+  "0883": "0883.HK", "883": "0883.HK", CNOOC: "0883.HK", "中海油": "0883.HK",
+  "0857": "0857.HK", "857": "0857.HK", PETROCHINA: "0857.HK", "中石油": "0857.HK",
+  "0386": "0386.HK", "386": "0386.HK", SINOPEC: "0386.HK", "中石化": "0386.HK",
+  "0267": "0267.HK", "267": "0267.HK", CITIC: "0267.HK", "中信": "0267.HK",
+  "0001": "0001.HK", "1": "0001.HK", "CK HUTCHISON": "0001.HK", "长和": "0001.HK",
+  "0175": "0175.HK", "175": "0175.HK", GEELY: "0175.HK", "吉利": "0175.HK", "吉利汽车": "0175.HK",
+  "0981": "981.HK", "981": "0981.HK", SMIC: "0981.HK", "中芯国际": "0981.HK",
+  "1211": "1211.HK", BYD: "1211.HK", "比亚迪股份": "1211.HK",
+  "2628": "2628.HK", "中国人寿": "2628.HK", "国寿": "2628.HK",
+  "2899": "2899.HK", "紫金矿业": "2899.HK",
+  "3988": "3988.HK", "BANK OF CHINA": "3988.HK", "中银": "3988.HK", "中国银行": "3988.HK",
+  "0939": "0939.HK", "939": "0939.HK", "CCB": "0939.HK", "建行": "0939.HK", "建设银行": "0939.HK",
+  "1288": "1288.HK", "农业银行": "1288.HK", "农行": "1288.HK", "ABC": "1288.HK",
+  "3328": "3328.HK", "交通银行": "3328.HK", "交行": "3328.HK", "BOCOM": "3328.HK",
+  "1339": "1339.HK", PICC: "1339.HK", "中国人保": "1339.HK",
+  "1336": "1336.HK", "新华保险": "1336.HK",
+  "6160": "6160.HK", BEIGENE: "6160.HK", "百济神州": "6160.HK",
+  "2269": "2269.HK", "WUXI BIO": "2269.HK", "药明生物": "2269.HK",
+  "6690": "6690.HK", "HAIER": "6690.HK", "海尔": "6690.HK", "海尔智家": "6690.HK",
+  "2020": "2020.HK", ANTA: "2020.HK", "安踏": "2020.HK", "安踏体育": "2020.HK",
+  "2331": "2331.HK", "LI NING": "2331.HK", "李宁": "2331.HK",
+  "6862": "6862.HK", HAIDILAO: "6862.HK", "海底捞": "6862.HK",
+  "1448": "1448.HK", "FUYAO GLASS": "1448.HK", "福耀玻璃": "1448.HK",
+  "1177": "1177.HK", SINO: "1177.HK", "中国生物制药": "1177.HK",
+  "1093": "1093.HK", CSPC: "1093.HK", "石药": "1093.HK", "石药集团": "1093.HK",
+  "2018": "2018.HK", "AAC": "2018.HK", "瑞声科技": "2018.HK",
+  "2313": "2313.HK", SHENZHOU: "2313.HK", "申洲国际": "2313.HK",
+
+  // ===== A-share (6-digit codes + names) =====
+  // Shanghai (.SS): 6xxxxx, 9xxxxx
+  "600519": "600519.SS", MOUTAI: "600519.SS", "茅台": "600519.SS", "贵州茅台": "600519.SS",
+  "601318": "601318.SS", "PING AN": "601318.SS", "中国平安": "601318.SS", "平安": "601318.SS",
+  "600036": "600036.SS", CMB: "600036.SS", "招商银行": "600036.SS", "招行": "600036.SS",
+  "601398": "601398.SS", "ICBC (A股)": "601398.SS", "工商银行": "601398.SS",
+  "601939": "601939.SS", CCB: "601939.SS", "建设银行": "601939.SS", "建行": "601939.SS",
+  "601288": "601288.SS", ABC: "601288.SS", "农业银行": "601288.SS", "农行": "601288.SS",
+  "600276": "600276.SS", HENGRUI: "600276.SS", "恒瑞医药": "600276.SS", "恒瑞": "600276.SS",
+  "600887": "600887.SS", YILI: "600887.SS", "伊利": "600887.SS", "伊利股份": "600887.SS",
+  "600030": "600030.SS", "CITIC SEC": "600030.SS", "中信证券": "600030.SS",
+  "601012": "601012.SS", LONGI: "601012.SS", "隆基": "601012.SS", "隆基绿能": "601012.SS",
+  "601888": "601888.SS", "中国中免": "601888.SS", "中免": "601888.SS",
+  "600028": "600028.SS", SINOPEC: "600028.SS", "中国石化": "600028.SS", "中石化": "600028.SS",
+  "601857": "601857.SS", PETROCHINA: "601857.SS", "中国石油": "601857.SS", "中石油": "601857.SS",
+  "600050": "600050.SS", "CHINA UNICOM": "600050.SS", "中国联通": "600050.SS",
+  "600900": "600900.SS", CYDP: "600900.SS", "长江电力": "600900.SS",
+  "601628": "601628.SS", "CHINA LIFE (A股)": "601628.SS", "中国人寿": "601628.SS", "国寿": "601628.SS",
+  "601988": "601988.SS", "BANK OF CHINA (A股)": "601988.SS", "中国银行": "601988.SS",
+  "600196": "600196.SS", "FOSUN PHARMA": "600196.SS", "复星医药": "600196.SS",
+  "600436": "600436.SS", PZH: "600436.SS", "片仔癀": "600436.SS",
+  "600660": "600660.SS", "FUYAO GLASS (A股)": "600660.SS", "福耀玻璃": "600660.SS",
+  "600690": "600690.SS", "HAIER (A股)": "600690.SS", "海尔智家": "600690.SS",
+  "600703": "600703.SS", SANAN: "600703.SS", "三安光电": "600703.SS",
+  "600809": "600809.SS", "SHANXI FENJIU": "600809.SS", "山西汾酒": "600809.SS", "汾酒": "600809.SS",
+  "600905": "600905.SS", "CYPC": "600905.SS", "三峡能源": "600905.SS",
+  "601088": "601088.SS", "CHINA SHENHUA": "601088.SS", "中国神华": "601088.SS", "神华": "601088.SS",
+  "601138": "601138.SS", "FOXCONN INDUSTRIAL": "601138.SS", "工业富联": "601138.SS", "鸿海工业": "601138.SS",
+  "601166": "601166.SS", CIB: "601166.SS", "兴业银行": "601166.SS",
+  "601186": "601186.SS", CRCC: "601186.SS", "中国铁建": "601186.SS", "中铁建": "601186.SS",
+  "601225": "601225.SS", "SHAANXI COAL": "601225.SS", "陕西煤业": "601225.SS",
+  "601319": "601319.SS", "PICC P&C": "601319.SS", "中国人保": "601319.SS",
+  "601336": "601336.SS", "新华保险": "601336.SS",
+  "601658": "601658.SS", PSBC: "601658.SS", "邮储银行": "601658.SS",
+  "601668": "601668.SS", CSCEC: "601668.SS", "中国建筑": "601668.SS",
+  "601688": "601688.SS", "HUATAI SEC": "601688.SS", "华泰证券": "601688.SS",
+  "601728": "601728.SS", "CHINA TELECOM": "601728.SS", "中国电信": "601728.SS",
+  "601800": "601800.SS", CCCC: "601800.SS", "中国交建": "601800.SS", "中交建": "601800.SS",
+  "601818": "601818.SS", "EVERBRIGHT": "601818.SS", "光大银行": "601818.SS",
+  "601838": "601838.SS", "BANK OF CHENGDU": "601838.SS", "成都银行": "601838.SS",
+  "601869": "601869.SS", YOFC: "601869.SS", "长飞光纤": "601869.SS",
+  "601877": "601877.SS", CHINT: "601877.SS", "正泰电器": "601877.SS",
+  "601899": "601899.SS", ZIJIN: "601899.SS", "紫金矿业": "601899.SS",
+  "601919": "601919.SS", "COSCO SHIPPING": "601919.SS", "中远海控": "601919.SS",
+  "601995": "601995.SS", CICC: "601995.SS", "中金公司": "601995.SS", "中金": "601995.SS",
+  "603019": "603019.SS", SUGON: "603019.SS", "中科曙光": "603019.SS",
+  "603259": "603259.SS", "WUXI APPTEC": "603259.SS", "药明康德": "603259.SS", "药明": "603259.SS",
+  "603288": "603288.SS", HAITIAN: "603288.SS", "海天味业": "603288.SS", "海天": "603288.SS",
+  "603501": "603501.SS", "WILL SEMI": "603501.SS", "韦尔股份": "603501.SS",
+  "603799": "603799.SS", CNGR: "603799.SS", "华友钴业": "603799.SS",
+  "603893": "603893.SS", XPENG: "603893.SS", "小鹏汽车": "603893.SS", "小鹏": "603893.SS",
+  "688981": "688981.SS", "SMIC (科创)": "688981.SS", "中芯国际": "688981.SS", "中芯": "688981.SS",
+
+  // Shenzhen (.SZ): 0xxxxx, 2xxxxx, 3xxxxx
+  "300750": "300750.SZ", CATL: "300750.SZ", "宁德时代": "300750.SZ", "宁德": "300750.SZ",
+  "002594": "002594.SZ", "BYD (A股)": "002594.SZ", "比亚迪": "002594.SZ",
+  "000858": "000858.SZ", WULIANGYE: "000858.SZ", "五粮液": "000858.SZ",
+  "000333": "000333.SZ", MIDEA: "000333.SZ", "美的": "000333.SZ", "美的集团": "000333.SZ",
+  "000651": "000651.SZ", GREE: "000651.SZ", "格力": "000651.SZ", "格力电器": "000651.SZ",
+  "002475": "002475.SZ", LUXSHARE: "002475.SZ", "立讯精密": "002475.SZ", "立讯": "002475.SZ",
+  "300059": "300059.SZ", "EAST MONEY": "300059.SZ", "东方财富": "300059.SZ", "东财": "300059.SZ",
+  "300760": "300760.SZ", MINDRAY: "300760.SZ", "迈瑞医疗": "300760.SZ", "迈瑞": "300760.SZ",
+  "002230": "002230.SZ", IFLYTEK: "002230.SZ", "科大讯飞": "002230.SZ", "讯飞": "002230.SZ",
+  "002415": "002415.SZ", HIKVISION: "002415.SZ", "海康威视": "002415.SZ", "海康": "002415.SZ",
+  "002714": "002714.SZ", MUYUAN: "002714.SZ", "牧原": "002714.SZ", "牧原股份": "002714.SZ",
+  "300015": "300015.SZ", "AIER EYE": "300015.SZ", "爱尔眼科": "300015.SZ",
+  "300124": "300124.SZ", INOVANCE: "300124.SZ", "汇川技术": "300124.SZ", "汇川": "300124.SZ",
+  "300661": "300661.SZ", "SG MICRO": "300661.SZ", "圣邦股份": "300661.SZ", "圣邦": "300661.SZ",
+  "300674": "300674.SZ", YUWELL: "300674.SZ", "鱼跃医疗": "300674.SZ", "鱼跃": "300674.SZ",
+  "300498": "300498.SZ", WENS: "300498.SZ", "温氏": "300498.SZ", "温氏股份": "300498.SZ",
+  "300433": "300433.SZ", "LENS TECH": "300433.SZ", "蓝思科技": "300433.SZ",
+  "002371": "002371.SZ", NAURA: "002371.SZ", "北方华创": "002371.SZ",
+  "002241": "002241.SZ", GOERTEK: "002241.SZ", "歌尔": "002241.SZ", "歌尔股份": "002241.SZ",
+  "300408": "300408.SZ", "CHAOZHOU THREE-CIRCLE": "300408.SZ", "三环集团": "300408.SZ", "三环": "300408.SZ",
+  "300782": "300782.SZ", MAXWELL: "300782.SZ", "迈为股份": "300782.SZ", "迈为": "300782.SZ",
+  "300394": "300394.SZ", "天孚通信": "300394.SZ",
+  "002466": "002466.SZ", TIANQI: "002466.SZ", "天齐锂业": "002466.SZ", "天齐": "002466.SZ",
+  "002460": "002460.SZ", GANFENG: "002460.SZ", "赣锋锂业": "002460.SZ", "赣锋": "002460.SZ",
+  "300014": "300014.SZ", "EVE ENERGY": "300014.SZ", "亿纬锂能": "300014.SZ", "亿纬": "300014.SZ",
+  "300751": "300751.SZ", "MAXWAY": "300751.SZ", "迈为股份": "300751.SZ", "迈为": "300751.SZ",
+  "300122": "300122.SZ", "ZHIFEI": "300122.SZ", "智飞生物": "300122.SZ", "智飞": "300122.SZ",
+  "300142": "300142.SZ", WALVAX: "300142.SZ", "沃森生物": "300142.SZ", "沃森": "300142.SZ",
+  "300628": "300628.SZ", TONLY: "300628.SZ", "同力股份": "300628.SZ",
+  "300347": "300347.SZ", "TONGDA POWER": "300347.SZ", "通达动力": "300347.SZ",
+  "002916": "002916.SZ", SHENNAN: "002916.SZ", "深南电路": "002916.SZ", "深南": "002916.SZ",
+  "002049": "002049.SZ", "紫光国微": "002049.SZ",
+};
+
+// === TICKER RESOLVER ===
+// Detects what the user typed and returns the canonical yfinance ticker.
+// Returns { ticker, market, displayName } or null.
+function resolveTicker(input) {
+  if (!input) return null;
+  const raw = input.trim();
+  if (!raw) return null;
+
+  // 1) Exact match in the map
+  if (TICKER_MAP[raw]) return canonicalize(TICKER_MAP[raw]);
+
+  // 2) Case-insensitive
+  const upper = raw.toUpperCase();
+  if (TICKER_MAP[upper]) return canonicalize(TICKER_MAP[upper]);
+  const lower = raw.toLowerCase();
+  if (TICKER_MAP[lower]) return canonicalize(TICKER_MAP[lower]);
+
+  // 3) Numeric input — guess market from digit count
+  if (/^\d+$/.test(raw)) {
+    // HK: 1-5 digits (user might type "700" or "0700")
+    if (raw.length <= 5) {
+      const padded = raw.padStart(5, "0");
+      if (TICKER_MAP[padded]) return canonicalize(TICKER_MAP[padded]);
+      return canonicalize(padded + ".HK");
+    }
+    // A-share: 6 digits — detect exchange by prefix
+    if (raw.length === 6) {
+      if (TICKER_MAP[raw]) return canonicalize(TICKER_MAP[raw]);
+      if (/^[69]/.test(raw)) return canonicalize(raw + ".SS");  // Shanghai
+      if (/^[023]/.test(raw)) return canonicalize(raw + ".SZ"); // Shenzhen
+      if (/^[48]/.test(raw)) return canonicalize(raw + ".BJ");  // Beijing
+      return canonicalize(raw + ".SS");  // Default to Shanghai
+    }
+  }
+
+  // 4) Already suffixed (e.g. "AAPL.US", "0700.HK", "600519.SS")
+  if (/^[A-Z0-9]+\.(HK|SS|SZ|BJ|US)$/i.test(raw)) {
+    return canonicalize(raw.toUpperCase());
+  }
+
+  return null;
+}
+
+// Normalize ticker to canonical yfinance form (uppercase prefix, dot suffix)
+function canonicalize(t) {
+  if (!t) return null;
+  const upper = t.toUpperCase();
+  // US tickers (no suffix): just uppercase
+  if (!upper.includes(".")) return { ticker: upper, market: "US" };
+  // With suffix: split
+  const [sym, suf] = upper.split(".");
+  const m = suf === "HK" ? "HK" : suf === "SS" ? "A-Share (沪)" : suf === "SZ" ? "A-Share (深)" : suf === "BJ" ? "A-Share (京)" : suf;
+  return { ticker: upper, market: m };
+}
 
 let currentQuote = null;
 
@@ -260,8 +565,28 @@ const copiedHint = $("copied");
 const QUICK = ["NVDA", "AAPL", "MSFT", "TSLA", "AMZN", "GOOGL", "META", "AMD", "AVGO", "MRVL", "IONQ", "SNDK", "CRCL", "QQQ"];
 
 function gen() {
-  const t = tickerInput.value.trim().toUpperCase();
-  if (!t) { promptArea.value = ""; return; }
+  const raw = tickerInput.value.trim();
+  if (!raw) {
+    promptArea.value = "";
+    document.getElementById("resolvedHint").textContent = "";
+    document.getElementById("resolvedHint").style.color = "#888";
+    return;
+  }
+  const resolved = resolveTicker(raw);
+  if (!resolved) {
+    promptArea.value = "";
+    document.getElementById("resolvedHint").textContent = "✗ 未识别, 请检查输入. 例: 苹果 / AAPL / 0700 / 600519";
+    document.getElementById("resolvedHint").style.color = "#fa4";
+    return;
+  }
+  const t = resolved.ticker;
+  // Show resolution hint
+  const hintEl = document.getElementById("resolvedHint");
+  const displayName = currentQuote && currentQuote.ticker === t ? currentQuote.name : "";
+  hintEl.textContent = `✓ ${t} (${resolved.market})${displayName ? " · " + displayName : ""}`;
+  hintEl.style.color = "#4f4";
+  // Update the input to show the resolved canonical form (preserves user typing experience)
+  // Don't overwrite if user is still typing — only on Enter
   promptArea.value = PROMPT_TEMPLATE(t, currentQuote);
   if (!currentQuote || currentQuote.ticker !== t) {
     fetchQuote(t);  // background fetch — on success, currentQuote updates and gen() re-runs
@@ -529,6 +854,21 @@ $("open").addEventListener("click", (e) => {
 });
 tickerInput.addEventListener("input", gen);
 tickerInput.addEventListener("keydown", (e) => { if (e.key === "Enter") gen(); });
+// Live resolution hint as user types (no full fetch, just resolve + show)
+tickerInput.addEventListener("input", () => {
+  const raw = tickerInput.value.trim();
+  const hintEl = document.getElementById("resolvedHint");
+  if (!raw) { hintEl.textContent = ""; return; }
+  const r = resolveTicker(raw);
+  if (r) {
+    const name = currentQuote && currentQuote.ticker === r.ticker ? ` · ${currentQuote.name}` : "";
+    hintEl.textContent = `✓ ${r.ticker} (${r.market})${name}`;
+    hintEl.style.color = "#4f4";
+  } else {
+    hintEl.textContent = "✗ 未识别";
+    hintEl.style.color = "#fa4";
+  }
+});
 
 // Quick-pick chips
 const quickDiv = $("quick");
