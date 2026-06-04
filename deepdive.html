@@ -46,6 +46,8 @@ textarea {
 }
 .copied { color: #4f4; font-size: 13px; margin-left: 8px; opacity: 0; transition: opacity 0.2s; }
 .copied.show { opacity: 1; }
+button.decide { background: #fa4; color: #000; }
+button.decide:hover { background: #fb5; }
 .hint { color: #888; font-size: 12px; margin-top: 8px; }
 .tickers { margin-top: 12px; }
 .tickers span {
@@ -74,9 +76,13 @@ textarea {
   <input type="text" id="ticker" placeholder="AAPL / 苹果 / 0700 / 600519 / 腾讯" value="NVDA" autocomplete="off" spellcheck="false">
   <div id="resolvedHint" style="font-size: 12px; margin-top: 4px; min-height: 16px; color: #4f4;"></div>
   <button id="gen">Generate Prompt</button>
+  <button id="decide" class="decide">Decide BUY/SELL</button>
   <button id="copy" class="secondary">Copy to Clipboard</button>
   <a id="open" target="_blank" rel="noopener" style="display:inline-block; margin-top:10px; background:#4af; color:#000; padding:10px 20px; border-radius:4px; text-decoration:none; font-weight:600; font-size:14px;">Open Claude.ai →</a>
   <span class="copied" id="copied">✓ Copied</span>
+  <label style="font-size: 12px; color: #888; margin-top: 8px; display: inline-block;">
+    <input type="checkbox" id="heavyMode" style="vertical-align: middle;"> Heavy mode (4 段辩论 + 风控 agent)
+  </label>
   <div class="hint">
     Need a Claude account? <a href="https://claude.ai" style="color:#4af;" target="_blank" rel="noopener">claude.ai</a> — free tier works for occasional use.
   </div>
@@ -447,6 +453,117 @@ function canonicalize(t) {
 }
 
 let currentQuote = null;
+
+// === DECIDE PROMPT ===
+// 3 段辩论 (中量, 默认) 或 4 段辩论 + 风控 (重量, --heavy).
+// 输出明确决策: BUY / HOLD / SELL + 仓位 + 信心度 + 触发价位.
+const DECIDE_PROMPT = (t, q, heavy) => {
+  const hasData = q && q.ticker === t && q.price != null;
+  const name = hasData && q.name ? ` (${q.name})` : '';
+
+  // Build data block (same logic as PROMPT_TEMPLATE)
+  let dataBlock = "";
+  if (hasData) {
+    const cur = q.currency || "USD";
+    const cs = cur === "USD" ? "$" : "";
+    const ce = cur === "USD" ? "" : " " + cur;
+    const chg = q.change != null ? q.change : (q.price - (q.prevClose || q.price));
+    const chgPct = q.changePct != null ? q.changePct : ((q.prevClose ? (chg / q.prevClose * 100) : 0));
+    const sign = chg >= 0 ? "+" : "";
+    const lines = [];
+    lines.push("**公司基本面:**");
+    lines.push(`- 公司: ${q.name}${q.name && q.name !== t ? ` (ticker: ${t})` : ""}`);
+    if (q.industry) lines.push(`- 行业: ${q.industry}`);
+    if (q.country) lines.push(`- 国家: ${q.country}`);
+    lines.push("", "**价格 (实时):**");
+    lines.push(`- 当前价: ${cs}${fmt(q.price)}${ce} (${sign}${fmt(chg)}, ${sign}${fmt(chgPct)}%)`);
+    if (q.open != null && !isNaN(q.open)) lines.push(`- 开盘: ${cs}${fmt(q.open)}`);
+    if (q.dayLow && q.dayHigh) lines.push(`- 日内区间: ${cs}${fmt(q.dayLow)} – ${cs}${fmt(q.dayHigh)}`);
+    if (q.volume) lines.push(`- 成交量: ${fmtBig(q.volume)}`);
+    if (q.low52w && q.high52w) lines.push(`- 52周区间: ${cs}${fmt(q.low52w)} – ${cs}${fmt(q.high52w)}`);
+    const valuation = [];
+    if (q.marketCap && q.marketCap > 0) {
+      valuation.push(`市值: ${q.marketCap >= 1000 ? (q.marketCap/1000).toFixed(2)+"T" : q.marketCap.toFixed(1)+"B"} USD`);
+    }
+    if (q.pe && !isNaN(q.pe)) valuation.push(`P/E (TTM): ${fmt(q.pe)}`);
+    if (q.peFwd && !isNaN(q.peFwd)) valuation.push(`P/E (Forward): ${fmt(q.peFwd)}`);
+    if (q.pb && !isNaN(q.pb)) valuation.push(`P/B: ${fmt(q.pb)}`);
+    if (q.ps && !isNaN(q.ps)) valuation.push(`P/S (TTM): ${fmt(q.ps)}`);
+    if (q.beta && !isNaN(q.beta)) valuation.push(`Beta: ${fmt(q.beta)}`);
+    if (valuation.length > 0) { lines.push("", "**估值:**"); valuation.forEach(v => lines.push(`- ${v}`)); }
+    const profit = [];
+    if (q.roe && !isNaN(q.roe)) profit.push(`ROE (TTM): ${fmt(q.roe)}%`);
+    if (q.roa && !isNaN(q.roa)) profit.push(`ROA (TTM): ${fmt(q.roa)}%`);
+    if (q.profitMargin && !isNaN(q.profitMargin)) profit.push(`净利率: ${fmt(q.profitMargin)}%`);
+    if (profit.length > 0) { lines.push("", "**盈利能力:**"); profit.forEach(p => lines.push(`- ${p}`)); }
+    const growth = [];
+    if (q.revGrowth && !isNaN(q.revGrowth)) growth.push(`营收增长 (YoY): ${q.revGrowth >= 0 ? "+" : ""}${fmt(q.revGrowth)}%`);
+    if (q.epsGrowth && !isNaN(q.epsGrowth)) growth.push(`EPS 增长 (YoY): ${q.epsGrowth >= 0 ? "+" : ""}${fmt(q.epsGrowth)}%`);
+    if (growth.length > 0) { lines.push("", "**增长:**"); growth.forEach(g => lines.push(`- ${g}`)); }
+    if (q.divYield && !isNaN(q.divYield)) {
+      lines.push("", `**股息:** 股息率 (年化) ${fmt(q.divYield)}%`);
+    }
+    dataBlock = "\n" + lines.join("\n");
+  }
+
+  const dataFallback = hasData ? "" : "\n(没拉到实时数据, 下面 6 章节你 (Claude) 全部用 WebSearch 查全)\n";
+
+  const lookup = `
+1. **产业链定位** (上游 2-4 关键供应商 / 中游商业模式护城河 / 下游 2-4 主要客户和终端市场 + 收入占比)
+2. **行业现状** (市场规模, 增长率, 关键趋势 3-5 个, 周期位置 early/mid/late)
+3. **近期催化剂** (近 30 天, 3-5 条带日期: 财报, 产品发布, 监管, 合作)
+4. **风险点** (行业 / 公司 / 估值 / 宏观, 各 1-2 条)
+5. **未来机会** (短期 3-6 月 / 中期 6-18 月 / 长期 18 月+, 各 1-2 条)`;
+
+  // 中量: 3 段辩论 (看多 / 看空 / 基金经理)
+  // 重量: 4 段 (中量 + 风控 agent)
+  const debateMedium = `
+1. **看多研究员** (Bull):
+   - 列出 3 个最强买入理由
+   - 每个理由引用 [已知数据] 中的具体数字, 或你 (Claude) 查到的利好
+
+2. **看空研究员** (Bear):
+   - 列出 3 个最强卖出/不买入理由
+   - 每个理由引用 [已知数据] + 你查到的利空
+
+3. **基金经理** (最终决策):${heavy ? "" : ""}
+   - 评判两方论证
+   - **决策**: BUY / HOLD / SELL (大写, 单独一行)
+   - **建议仓位**: 1-3% / 3-5% / 5-10% / 暂缓
+   - **信心度**: 高 / 中 / 低 (各维度: 数据面 / 估值面 / 催化剂面)
+   - **触发买入价位**: 突破 $X 加仓 / 跌破 $Y 止损
+   - **关键监控点**: 下次财报日 / 监管事件 / 产品发布`;
+
+  const riskAgent = `
+4. **风控 agent** (组合层检查, 假设我有持仓):
+   - 这个标的加入后, 我的组合:
+     - 行业集中度变化? (科技股占比是否超过 60%)
+     - 个股权重变化? (单只 > 15% 集中度风险)
+     - 跟现有持仓的相关性? (跟 NVDA 加 AI 股再加就是同向)
+     - 最大回撤敞口? (这个仓位如果 -20% 我能睡得着吗)
+   - **风险调整后建议仓位**: X% (可能从纯技术仓位调到更低因为集中度)`;
+
+  const debateFull = debateMedium + (heavy ? riskAgent : "");
+
+  return `请对 **${t}**${name} 做一份明确的 BUY/HOLD/SELL 决策分析.${dataFallback}
+
+**已知数据 (${hasData ? q.source + ", 实时拉取, 直接用, 别再查 API" : "无实时数据"}):**${dataBlock}
+
+**请按以下 ${heavy ? "4 段" : "3 段"}辩论流程决策**:
+${debateFull}
+
+**需要你 (Claude) 查 WebSearch / WebFetch 补全的章节** (无 API 数据, 你自己查):
+${lookup}
+
+**输出格式**:
+- **第一行**: 决策 (BUY / HOLD / SELL) + 仓位 + 信心度 (3-4 段总结)
+- 接下来: 完整辩论 + 6 章节分析
+- 末尾: 免责声明
+
+---
+
+**免责声明**: 本报告由 AI 模型基于 ${hasData ? q.source + " + " : ""}Web 搜索综合生成, 仅供研究参考, **不构成投资建议**. 投资有风险, 决策需谨慎. 投资有风险, 决策需谨慎.`;
+};
 
 const PROMPT_TEMPLATE = (t, q) => {
   const hasData = q && q.ticker === t && q.price != null;
@@ -894,6 +1011,31 @@ $("open").addEventListener("click", (e) => {
 });
 tickerInput.addEventListener("input", gen);
 tickerInput.addEventListener("keydown", (e) => { if (e.key === "Enter") gen(); });
+// Decide button: generate a BUY/HOLD/SELL prompt with multi-agent debate
+document.getElementById("decide").addEventListener("click", () => {
+  const raw = tickerInput.value.trim();
+  if (!raw) {
+    document.getElementById("resolvedHint").textContent = "请先输入 ticker";
+    document.getElementById("resolvedHint").style.color = "#fa4";
+    return;
+  }
+  const resolved = resolveTicker(raw);
+  if (!resolved) {
+    document.getElementById("resolvedHint").textContent = "✗ 未识别, 请检查输入";
+    document.getElementById("resolvedHint").style.color = "#fa4";
+    return;
+  }
+  const t = resolved.ticker;
+  const heavy = document.getElementById("heavyMode").checked;
+  const hintEl = document.getElementById("resolvedHint");
+  const displayName = currentQuote && currentQuote.ticker === t ? ` · ${currentQuote.name}` : "";
+  hintEl.textContent = `✓ ${t} (${resolved.market})${displayName} · ${heavy ? "HEAVY (4 段 + 风控)" : "MEDIUM (3 段辩论)"}`;
+  hintEl.style.color = "#fa4";
+  promptArea.value = DECIDE_PROMPT(t, currentQuote, heavy);
+  if (!currentQuote || currentQuote.ticker !== t) {
+    fetchQuote(t);
+  }
+});
 // Live resolution hint as user types (no full fetch, just resolve + show)
 tickerInput.addEventListener("input", () => {
   const raw = tickerInput.value.trim();
